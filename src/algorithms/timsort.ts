@@ -129,41 +129,270 @@ function* mergeAt(arr: number[], runs: { start: number; len: number }[], i: numb
   const run2 = runs[i + 1];
 
   // Merge run1 and run2
-  yield* merge(arr, run1.start, run1.start + run1.len - 1, run2.start + run2.len - 1);
+  if (run1.len <= run2.len) {
+    yield* mergeLo(arr, run1.start, run1.len, run2.start, run2.len);
+  } else {
+    yield* mergeHi(arr, run1.start, run1.len, run2.start, run2.len);
+  }
 
   // Update runs stack
   runs[i] = { start: run1.start, len: run1.len + run2.len };
   runs.splice(i + 1, 1);
 }
 
-// Simple merge for visualization, in reality Timsort uses a more complex galloping merge
-function* merge(arr: number[], left: number, mid: number, right: number): Generator<VisualizerStep> {
-  const temp = arr.slice(left, right + 1);
-  let i = 0;
-  let j = mid - left + 1;
-  let k = left;
-  const midInTemp = mid - left;
-  const endInTemp = right - left;
+const MIN_GALLOP = 7;
 
-  while (i <= midInTemp && j <= endInTemp) {
-    yield { type: 'COMPARE', indices: [left + i, left + j] };
-    if (temp[i] <= temp[j]) {
-      arr[k] = temp[i++];
-    } else {
-      arr[k] = temp[j++];
+function* mergeLo(arr: number[], base1: number, len1: number, base2: number, len2: number): Generator<VisualizerStep> {
+  const temp = arr.slice(base1, base1 + len1);
+  let i = 0; // index in temp
+  let j = base2; // index in arr
+  let k = base1; // index in arr
+  
+  let m1 = len1;
+  let m2 = len2;
+
+  let minGallop = MIN_GALLOP;
+
+  outer: while (true) {
+    let count1 = 0;
+    let count2 = 0;
+
+    // 1. One-at-a-time mode
+    do {
+      yield { type: 'COMPARE', indices: [k, j] };
+      if (arr[j] < temp[i]) {
+        arr[k++] = arr[j++];
+        yield { type: 'SET', index: k - 1, value: arr[k - 1], array: [...arr] };
+        count2++;
+        count1 = 0;
+        if (--m2 === 0) break outer;
+      } else {
+        arr[k++] = temp[i++];
+        yield { type: 'SET', index: k - 1, value: arr[k - 1], array: [...arr] };
+        count1++;
+        count2 = 0;
+        if (--m1 === 0) break outer;
+      }
+    } while ((count1 | count2) < minGallop);
+
+    // 2. Galloping mode
+    do {
+      // Gallop in run1 for first element of run2
+      let gallop1 = yield* gallopRight(arr[j], temp, i, m1, 0);
+      if (gallop1 !== 0) {
+        for (let x = 0; x < gallop1; x++) {
+          arr[k++] = temp[i++];
+          yield { type: 'SET', index: k - 1, value: arr[k - 1], array: [...arr] };
+        }
+        m1 -= gallop1;
+        if (m1 === 0) break outer;
+      }
+      arr[k++] = arr[j++];
+      yield { type: 'SET', index: k - 1, value: arr[k - 1], array: [...arr] };
+      if (--m2 === 0) break outer;
+
+      // Gallop in run2 for first element of run1
+      let gallop2 = yield* gallopLeft(temp[i], arr, j, m2, 0);
+      if (gallop2 !== 0) {
+        for (let x = 0; x < gallop2; x++) {
+          arr[k++] = arr[j++];
+          yield { type: 'SET', index: k - 1, value: arr[k - 1], array: [...arr] };
+        }
+        m2 -= gallop2;
+        if (m2 === 0) break outer;
+      }
+      arr[k++] = temp[i++];
+      yield { type: 'SET', index: k - 1, value: arr[k - 1], array: [...arr] };
+      if (--m1 === 0) break outer;
+
+      minGallop--;
+    } while (minGallop >= 0); // Keep galloping if it's working
+    
+    minGallop += 2; // Penalize for leaving galloping mode
+  }
+
+  // Final cleanup
+  while (m1 > 0) {
+    arr[k++] = temp[i++];
+    yield { type: 'SET', index: k - 1, value: arr[k - 1], array: [...arr] };
+    m1--;
+  }
+}
+
+function* mergeHi(arr: number[], base1: number, len1: number, base2: number, len2: number): Generator<VisualizerStep> {
+  const temp = arr.slice(base2, base2 + len2);
+  let i = base1 + len1 - 1; // index in arr
+  let j = len2 - 1; // index in temp
+  let k = base2 + len2 - 1; // index in arr
+
+  let m1 = len1;
+  let m2 = len2;
+
+  let minGallop = MIN_GALLOP;
+
+  outer: while (true) {
+    let count1 = 0;
+    let count2 = 0;
+
+    // 1. One-at-a-time mode
+    do {
+      yield { type: 'COMPARE', indices: [i, k] };
+      if (temp[j] < arr[i]) {
+        arr[k--] = arr[i--];
+        yield { type: 'SET', index: k + 1, value: arr[k + 1], array: [...arr] };
+        count1++;
+        count2 = 0;
+        if (--m1 === 0) break outer;
+      } else {
+        arr[k--] = temp[j--];
+        yield { type: 'SET', index: k + 1, value: arr[k + 1], array: [...arr] };
+        count2++;
+        count1 = 0;
+        if (--m2 === 0) break outer;
+      }
+    } while ((count1 | count2) < minGallop);
+
+    // 2. Galloping mode
+    do {
+      // Gallop in run1 for last element of run2
+      let gallop1 = m1 - (yield* gallopRight(temp[j], arr, base1, m1, m1 - 1));
+      if (gallop1 !== 0) {
+        for (let x = 0; x < gallop1; x++) {
+          arr[k--] = arr[i--];
+          yield { type: 'SET', index: k + 1, value: arr[k + 1], array: [...arr] };
+        }
+        m1 -= gallop1;
+        if (m1 === 0) break outer;
+      }
+      arr[k--] = temp[j--];
+      yield { type: 'SET', index: k + 1, value: arr[k + 1], array: [...arr] };
+      if (--m2 === 0) break outer;
+
+      // Gallop in run2 for last element of run1
+      let gallop2 = m2 - (yield* gallopLeft(arr[i], temp, 0, m2, m2 - 1));
+      if (gallop2 !== 0) {
+        for (let x = 0; x < gallop2; x++) {
+          arr[k--] = temp[j--];
+          yield { type: 'SET', index: k + 1, value: arr[k + 1], array: [...arr] };
+        }
+        m2 -= gallop2;
+        if (m2 === 0) break outer;
+      }
+      arr[k--] = arr[i--];
+      yield { type: 'SET', index: k + 1, value: arr[k + 1], array: [...arr] };
+      if (--m1 === 0) break outer;
+
+      minGallop--;
+    } while (minGallop >= 0);
+
+    minGallop += 2;
+  }
+
+  // Final cleanup
+  while (m2 > 0) {
+    arr[k--] = temp[j--];
+    yield { type: 'SET', index: k + 1, value: arr[k + 1], array: [...arr] };
+    m2--;
+  }
+}
+
+function* gallopLeft(key: number, arr: number[], base: number, len: number, hint: number): Generator<VisualizerStep, number> {
+  let lastOffset = 0;
+  let offset = 1;
+  
+  yield { type: 'COMPARE', indices: [base + hint] };
+  if (arr[base + hint] < key) {
+    // Gallop right until arr[base + hint + offset] >= key
+    const maxOffset = len - hint;
+    while (offset < maxOffset) {
+      yield { type: 'COMPARE', indices: [base + hint + offset] };
+      if (arr[base + hint + offset] < key) {
+        lastOffset = offset;
+        offset = (offset << 1) + 1;
+        if (offset <= 0) offset = maxOffset;
+      } else {
+        break;
+      }
     }
-    yield { type: 'SET', index: k, value: arr[k], array: [...arr] };
-    k++;
+    if (offset > maxOffset) offset = maxOffset;
+    
+    lastOffset += hint;
+    offset += hint;
+  } else {
+    // Gallop left until arr[base + hint - offset] < key
+    const maxOffset = hint + 1;
+    while (offset < maxOffset) {
+      yield { type: 'COMPARE', indices: [base + hint - offset] };
+      if (arr[base + hint - offset] >= key) {
+        lastOffset = offset;
+        offset = (offset << 1) + 1;
+        if (offset <= 0) offset = maxOffset;
+      } else {
+        break;
+      }
+    }
+    if (offset > maxOffset) offset = maxOffset;
+    
+    let tmp = lastOffset;
+    lastOffset = hint - offset;
+    offset = hint - tmp;
   }
 
-  while (i <= midInTemp) {
-    arr[k] = temp[i++];
-    yield { type: 'SET', index: k, value: arr[k], array: [...arr] };
-    k++;
+  // Binary search in [base + lastOffset, base + offset]
+  lastOffset++;
+  while (lastOffset < offset) {
+    let m = lastOffset + ((offset - lastOffset) >>> 1);
+    yield { type: 'COMPARE', indices: [base + m] };
+    if (arr[base + m] < key) lastOffset = m + 1;
+    else offset = m;
   }
-  while (j <= endInTemp) {
-    arr[k] = temp[j++];
-    yield { type: 'SET', index: k, value: arr[k], array: [...arr] };
-    k++;
+  return offset;
+}
+
+function* gallopRight(key: number, arr: number[], base: number, len: number, hint: number): Generator<VisualizerStep, number> {
+  let offset = 1;
+  let lastOffset = 0;
+
+  yield { type: 'COMPARE', indices: [base + hint] };
+  if (arr[base + hint] <= key) {
+    const maxOffset = len - hint;
+    while (offset < maxOffset) {
+      yield { type: 'COMPARE', indices: [base + hint + offset] };
+      if (arr[base + hint + offset] <= key) {
+        lastOffset = offset;
+        offset = (offset << 1) + 1;
+        if (offset <= 0) offset = maxOffset;
+      } else {
+        break;
+      }
+    }
+    if (offset > maxOffset) offset = maxOffset;
+    lastOffset += hint;
+    offset += hint;
+  } else {
+    const maxOffset = hint + 1;
+    while (offset < maxOffset) {
+      yield { type: 'COMPARE', indices: [base + hint - offset] };
+      if (arr[base + hint - offset] > key) {
+        lastOffset = offset;
+        offset = (offset << 1) + 1;
+        if (offset <= 0) offset = maxOffset;
+      } else {
+        break;
+      }
+    }
+    if (offset > maxOffset) offset = maxOffset;
+    let tmp = lastOffset;
+    lastOffset = hint - offset;
+    offset = hint - tmp;
   }
+
+  lastOffset++;
+  while (lastOffset < offset) {
+    let m = lastOffset + ((offset - lastOffset) >>> 1);
+    yield { type: 'COMPARE', indices: [base + m] };
+    if (arr[base + m] <= key) lastOffset = m + 1;
+    else offset = m;
+  }
+  return offset;
 }
