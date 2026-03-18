@@ -2,6 +2,7 @@
   "name": "sorting-visualizer",
   "private": true,
   "version": "0.0.0",
+  "description": "在同一页面上同时演示 7 种经典排序算法，可以直观地观察和对比不同算法在处理相同乱序数据时的执行效率和工作原理。可用于算法介绍素材。",
   "type": "module",
   "scripts": {
     "dev": "vite",
