@@ -4,7 +4,7 @@ import { ALGORITHMS, ALGORITHM_DETAILS } from './algorithms';
 import { VisualizerState, VisualizerStep, Theme } from './types';
 
 const ALGORITHM_KEYS = [
-  'bubbleSort', 'selectionSort', 'insertionSort', 
+  'bubbleSort', 'selectionSort', 'insertionSort', 'shellSort',
   'mergeSort', 'quickSort', 'heapSort', 'timsort'
 ];
 
@@ -24,7 +24,7 @@ function App() {
   const [finishOrder, setFinishOrder] = useState<string[]>([]);
 
   const generatorsRef = useRef<Record<string, Generator<VisualizerStep> | null>>({});
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const generateArray = useCallback((newSize = size) => {
     const baseArray = Array.from({ length: newSize }, () => Math.floor(Math.random() * 380) + 20);
@@ -159,7 +159,7 @@ function App() {
       <header>
         <div className="header-left">
           <h1>多算法排序实时对比</h1>
-          <p className="subtitle">7 种排序算法在相同初始数据下的效率博弈</p>
+          <p className="subtitle">8 种排序算法在相同初始数据下的效率博弈</p>
         </div>
         <div className="global-controls">
           <div className="control-group">

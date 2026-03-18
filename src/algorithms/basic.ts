@@ -54,3 +54,38 @@ export function* insertionSort(array: number[]): Generator<VisualizerStep> {
     yield { type: 'SORTED', index: i }; // For visual, everything up to i is "partially sorted"
   }
 }
+
+export function* shellSort(array: number[]): Generator<VisualizerStep> {
+  const arr = [...array];
+  const n = arr.length;
+
+  if (n === 0) return;
+
+  // 希尔增量序列: n/2, n/4, ..., 1
+  for (let gap = Math.floor(n / 2); gap > 0; gap = Math.floor(gap / 2)) {
+    // 对每个 gap 进行插入排序
+    for (let i = gap; i < n; i++) {
+      const temp = arr[i];
+      yield { type: 'KEY', index: i };
+
+      let j = i;
+      while (j >= gap) {
+        yield { type: 'COMPARE', indices: [j - gap, j] };
+        if (arr[j - gap] > temp) {
+          arr[j] = arr[j - gap];
+          yield { type: 'SWAP', indices: [j - gap, j], array: [...arr] };
+          j -= gap;
+        } else {
+          break;
+        }
+      }
+      arr[j] = temp;
+      yield { type: 'SET', index: j, value: temp, array: [...arr] };
+    }
+  }
+
+  // 标记所有元素已排序
+  for (let i = 0; i < n; i++) {
+    yield { type: 'SORTED', index: i };
+  }
+}

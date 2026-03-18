@@ -1,4 +1,4 @@
-import { bubbleSort, selectionSort, insertionSort } from './basic';
+import { bubbleSort, selectionSort, insertionSort, shellSort } from './basic';
 import { mergeSort, quickSort, heapSort } from './advanced';
 import { timsort } from './timsort';
 import { AlgorithmInfo } from '../types';
@@ -7,6 +7,7 @@ export const ALGORITHMS: Record<string, any> = {
   bubbleSort,
   selectionSort,
   insertionSort,
+  shellSort,
   mergeSort,
   quickSort,
   heapSort,
@@ -30,6 +31,12 @@ export const ALGORITHM_DETAILS: Record<string, AlgorithmInfo> = {
     name: '插入排序 (Insertion Sort)',
     description: '通过构建有序序列，对于未排序数据，在已排序序列中从后向前扫描，找到相应位置并插入。',
     timeComplexity: { best: 'O(n)', average: 'O(n²)', worst: 'O(n²)' },
+    spaceComplexity: 'O(1)',
+  },
+  shellSort: {
+    name: '希尔排序 (Shell Sort)',
+    description: '插入排序的改进版，通过将原数据集分成若干子序列分别进行插入排序，最后再进行一次全体插入排序。',
+    timeComplexity: { best: 'O(n log n)', average: 'O(n^1.3)', worst: 'O(n²)' },
     spaceComplexity: 'O(1)',
   },
   mergeSort: {
