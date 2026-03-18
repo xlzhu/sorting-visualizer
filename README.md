@@ -1,6 +1,6 @@
 # 多算法排序实时可视化对比工具 (Sorting Visualizer)
 
-在同一页面上同时演示 7 种经典排序算法，可以直观地观察和对比不同算法在处理相同乱序数据时的执行效率和工作原理。可用于算法介绍素材。
+这是一个基于 React 和 TypeScript 构建的高性能、交互式排序算法可视化工具。它能够在一个页面上同时并行演示 7 种经典排序算法，让用户直观地观察和对比不同算法在处理相同乱序数据时的执行效率和工作原理。
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)
